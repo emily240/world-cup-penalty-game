@@ -28,3 +28,57 @@
   .overlay{padding:max(14px,env(safe-area-inset-top)) max(24px,env(safe-area-inset-right)) max(14px,env(safe-area-inset-bottom)) max(24px,env(safe-area-inset-left))}
 }
 @keyframes phone-turn{0%,100%{transform:rotate(0)}50%{transform:rotate(90deg)}}
+
+/* Dedicated iPhone portrait route: HUD and shot result stay outside the pitch. */
+.mobile-game{
+  --mobile-pitch-height:min(44dvh,430px);
+  display:flex;
+  flex-direction:column;
+  justify-content:flex-start;
+  align-items:center;
+  padding-top:calc(max(8px,env(safe-area-inset-top)) + 68px);
+  background:linear-gradient(180deg,#071522 0 9%,#133247 56%,#071522 100%);
+}
+.mobile-game canvas{
+  flex:0 0 var(--mobile-pitch-height);
+  width:100%;
+  height:var(--mobile-pitch-height);
+  max-width:none;
+  max-height:none;
+  object-fit:fill;
+  border-top:1px solid #ffffff2a;
+  border-bottom:1px solid #ffffff2a;
+  box-shadow:0 12px 30px #0008;
+}
+.mobile-game .orientation-hint,.mobile-game .brand{display:none!important}
+.mobile-game .hud{
+  top:max(8px,env(safe-area-inset-top));
+  left:max(8px,env(safe-area-inset-left));
+  width:calc(100% - max(74px,env(safe-area-inset-right)) - max(8px,env(safe-area-inset-left)));
+  height:54px;
+  transform:none;
+  z-index:6;
+}
+.mobile-game .hud>div{display:flex;flex:1;min-width:0;padding:6px 5px;flex-direction:column;align-items:center;justify-content:center}
+.mobile-game .hud b{font-size:20px;line-height:1}.mobile-game .hud em{font-size:12px}
+.mobile-game .hud .target{display:flex}.mobile-game .hud .target b{font-size:11px;line-height:1.1}
+.mobile-game .pause{top:max(15px,calc(env(safe-area-inset-top) + 7px));right:max(8px,env(safe-area-inset-right));z-index:7}
+.mobile-game .result{
+  top:calc(max(8px,env(safe-area-inset-top)) + 68px + var(--mobile-pitch-height) + 12px);
+  width:100%;
+  text-align:center;
+  font-size:clamp(32px,11vw,52px);
+  z-index:5;
+}
+@media (orientation:portrait) and (max-width:700px){
+  .mobile-game .overlay{padding:max(18px,env(safe-area-inset-top)) max(16px,env(safe-area-inset-right)) max(18px,env(safe-area-inset-bottom)) max(16px,env(safe-area-inset-left))}
+  .mobile-game .card h1{font-size:48px}
+  .mobile-game .cup{right:16px;top:max(38px,env(safe-area-inset-top))}
+  .mobile-game .endcard{transform:scale(.86)}
+}
+@media (orientation:landscape){
+  .mobile-game{--mobile-pitch-height:100dvh;padding-top:0}
+  .mobile-game .hud{left:50%;width:auto;transform:translateX(-50%)}
+  .mobile-game .brand{display:flex!important}
+  .mobile-game .result{top:115px}
+}

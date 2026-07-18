@@ -4,5 +4,9 @@ import { defineConfig } from "vite";
 export default defineConfig({
   base: "./",
   plugins: [react()],
-  build: { outDir: "pages-dist", emptyOutDir: true },
+  build: {
+    outDir: "pages-dist",
+    emptyOutDir: true,
+    rollupOptions: { input: ["index.html", "mobile/index.html"] },
+  },
 });

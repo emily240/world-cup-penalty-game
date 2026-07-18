@@ -10,7 +10,7 @@ const W = 1280, H = 720, TARGET = 5;
 
 class AudioEngine {
   ctx?: AudioContext; track?: HTMLAudioElement; music = true; sound = true; active = false;
-  start() { if (!this.ctx) this.ctx = new AudioContext(); this.ctx.resume();if(!this.track){this.track=new Audio("./match-music.mp3");this.track.preload="auto";this.track.volume=.48}this.track.currentTime=0;this.active=true;if(this.music)this.track.play().catch(()=>{}); }
+  start() { if (!this.ctx) this.ctx = new AudioContext(); this.ctx.resume();if(!this.track){const musicPath=window.location.pathname.endsWith("/mobile/")?"../match-music.mp3":"./match-music.mp3";this.track=new Audio(musicPath);this.track.preload="auto";this.track.volume=.48}this.track.currentTime=0;this.active=true;if(this.music)this.track.play().catch(()=>{}); }
   setMusic(v:boolean) { this.music=v;if(!this.track)return;if(v&&this.active)this.track.play().catch(()=>{});else this.track.pause(); }
   setGameActive(v:boolean){this.active=v;if(!this.track)return;if(v&&this.music)this.track.play().catch(()=>{});else this.track.pause()}
   tone(f:number,d=.1,v=.1,type:OscillatorType="sine",when?:number){if(!this.ctx||!this.sound)return; const o=this.ctx.createOscillator(),g=this.ctx.createGain(),t=when??this.ctx.currentTime;o.type=type;o.frequency.setValueAtTime(f,t);g.gain.setValueAtTime(v,t);g.gain.exponentialRampToValueAtTime(.001,t+d);o.connect(g).connect(this.ctx.destination);o.start(t);o.stop(t+d);}
@@ -20,7 +20,7 @@ class AudioEngine {
 
 function Button({children,onClick,secondary=false}:{children:React.ReactNode;onClick:()=>void;secondary?:boolean}){return <button className={secondary?"btn secondary":"btn"} onClick={onClick}>{children}</button>}
 
-export default function Home(){
+export default function Home({mobileMode=false}:{mobileMode?:boolean}){
   const canvasRef=useRef<HTMLCanvasElement>(null), game=useRef<any>(null), audio=useRef(new AudioEngine());
   const [screen,setScreen]=useState<Screen>("menu"),[result,setResult]=useState<Result>(""),[stats,setStats]=useState<Stats>({goals:0,shots:0,saves:0,time:60});
   const [music,setMusic]=useState(true),[sound,setSound]=useState(true);
@@ -62,7 +62,9 @@ export default function Home(){
     G.reset=(full=false)=>{G.reactionTimers.forEach(clearTimeout);G.reactionTimers=[];originalReset(full);G.savedPose=false;G.deflect=null;G.ball.y=525;G.phase="placeBall";G.player={x:835,y:630};G.targetRel={x:-145+Math.random()*290,y:-48+Math.random()*96,vx:(Math.random()<.5?-1:1)*(10+Math.random()*7),vy:(Math.random()<.5?-1:1)*(7+Math.random()*5)};if(full){G.goalOffset=0;G.goalOffsetY=0;G.goalVelocity=135;G.goalVelocityY=-90}};
     G.pointer=(type:string,e:PointerEvent)=>{
       if(screen!=="playing"||!["idle","place","charge"].includes(G.state))return;
-      const r=c.getBoundingClientRect(),x=(e.clientX-r.left)*W/r.width,y=(e.clientY-r.top)*H/r.height;
+      const r=c.getBoundingClientRect(),px=e.clientX-r.left,py=e.clientY-r.top;
+      const x=mobileMode?(px-G.view.ox)/G.view.scale:px*W/r.width;
+      const y=mobileMode?(py-G.view.oy)/G.view.scale:py*H/r.height;
       if(type==="down"){
         if(G.phase==="placeBall"&&y>455){G.state="place";G.drag=true;c.setPointerCapture(e.pointerId)}
         else if(G.phase==="runup"&&y>470){G.state="charge";G.drag=true;c.setPointerCapture(e.pointerId)}
@@ -89,7 +91,17 @@ export default function Home(){
     window.addEventListener("keydown",keydown);
     // Variable keeper rhythm: bursts, direction changes and short feint pauses.
     const keeperRhythm=window.setInterval(()=>{if(screen!=="playing"||G.state==="flight"||statsRef.current.goals>=4)return;const roll=Math.random();if(roll<.06)G.keeper.v=0;else if(roll<.34)G.keeper.v*=-1.65;else G.keeper.v=(Math.random()<.5?-1:1)*(260+Math.random()*420)},170);
-    const resize=()=>{const d=Math.min(devicePixelRatio||1,2),r=c.getBoundingClientRect();c.width=Math.round(r.width*d);c.height=Math.round(r.height*d);ctx.setTransform(c.width/W,0,0,c.height/H,0,0)};resize();new ResizeObserver(resize).observe(c);
+    const resize=()=>{
+      const d=Math.min(devicePixelRatio||1,2),r=c.getBoundingClientRect();
+      c.width=Math.round(r.width*d);c.height=Math.round(r.height*d);
+      if(mobileMode){
+        const scale=Math.max(r.width/W,r.height/H),ox=(r.width-W*scale)/2,oy=(r.height-H*scale)/2;
+        G.view={scale,ox,oy};ctx.setTransform(scale*d,0,0,scale*d,ox*d,oy*d);
+      }else{
+        G.view={scale:r.width/W,ox:0,oy:0};ctx.setTransform(c.width/W,0,0,c.height/H,0,0);
+      }
+    };
+    resize();const resizeObserver=new ResizeObserver(resize);resizeObserver.observe(c);
     const pd=(e:PointerEvent)=>G.pointer("down",e),pm=(e:PointerEvent)=>G.pointer("move",e),pu=(e:PointerEvent)=>G.pointer("up",e);c.addEventListener("pointerdown",pd);c.addEventListener("pointermove",pm);c.addEventListener("pointerup",pu);c.addEventListener("pointercancel",pu);
 
     const round=(x:number,y:number,w:number,h:number,r:number)=>{ctx.beginPath();ctx.roundRect(x,y,w,h,r);ctx.fill()};
@@ -151,18 +163,19 @@ export default function Home(){
       ctx.strokeStyle=`rgba(230,250,255,${.55+G.net*.25})`;ctx.lineWidth=2;for(let x=365;x<=915;x+=34){ctx.beginPath();ctx.moveTo(x+go,110+gy);ctx.lineTo(x+go+(x-640)*.04*G.net,325+gy+Math.sin(t*20+x)*7*G.net);ctx.stroke()}for(let y=120;y<=325;y+=25){ctx.beginPath();ctx.moveTo(365+go,y+gy);ctx.lineTo(915+go,y+gy+Math.sin(t*18+y)*5*G.net);ctx.stroke()}ctx.strokeStyle="#fff";ctx.lineWidth=14;ctx.lineJoin="round";ctx.beginPath();ctx.moveTo(360+go,330+gy);ctx.lineTo(360+go,105+gy);ctx.lineTo(920+go,105+gy);ctx.lineTo(920+go,330+gy);ctx.stroke();
       if(goalStage>=4){G.targetRel.x+=G.targetRel.vx*goalDt;G.targetRel.y+=G.targetRel.vy*goalDt;if(Math.abs(G.targetRel.x)>155)G.targetRel.vx*=-1;if(Math.abs(G.targetRel.y)>55)G.targetRel.vy*=-1;G.target={x:640+go+G.targetRel.x,y:215+gy+G.targetRel.y};ctx.fillStyle="rgba(255,255,255,.88)";ctx.beginPath();ctx.arc(G.target.x,G.target.y,46,0,7);ctx.fill();ctx.fillStyle="#ed2939";ctx.beginPath();ctx.arc(G.target.x,G.target.y,34,0,7);ctx.fill();ctx.fillStyle="#fff";ctx.beginPath();ctx.arc(G.target.x,G.target.y,22,0,7);ctx.fill();ctx.fillStyle="#ffd43b";ctx.beginPath();ctx.arc(G.target.x,G.target.y,11,0,7);ctx.fill();ctx.fillStyle="#081522";ctx.font="900 13px Arial";ctx.textAlign="center";ctx.fillText("HIT TARGET",G.target.x,G.target.y-57);drawDrinkingKeeper(t)}else drawKeeper(t);
       if(G.phase==="placeBall"&&["idle","place"].includes(G.state)){ctx.fillStyle="rgba(255,216,51,.2)";ctx.beginPath();ctx.arc(G.ball.x,G.ball.y,44+Math.sin(t*7)*5,0,7);ctx.fill();ctx.strokeStyle="#ffd833";ctx.lineWidth=3;ctx.beginPath();ctx.arc(G.ball.x,G.ball.y,34,0,7);ctx.stroke()}
-      if(G.state==="charge"){ctx.setLineDash([10,10]);ctx.strokeStyle="rgba(255,255,255,.65)";ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(G.ball.x,G.ball.y);ctx.lineTo(G.aim.x,G.aim.y);ctx.stroke();ctx.strokeStyle="#ffd833";ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(G.ball.x-12,G.ball.y+10);ctx.lineTo(G.player.x,G.player.y-42);ctx.lineTo(G.ball.x+12,G.ball.y+10);ctx.stroke();ctx.setLineDash([]);ctx.strokeStyle="#ffdf41";ctx.lineWidth=5;ctx.beginPath();ctx.arc(G.aim.x,G.aim.y,22+Math.sin(t*8)*3,0,7);ctx.stroke();ctx.fillStyle="rgba(10,20,30,.55)";round(1035,480,32,174,16);ctx.fillStyle=G.power>.82?"#ff5252":"#ffd833";ctx.fillRect(1041,648-G.power*160,20,G.power*160);ctx.fillStyle="#fff";ctx.font="800 15px Arial";ctx.textAlign="center";ctx.fillText("POWER",1051,675)}
+      const powerX=mobileMode?900:1035;
+      if(G.state==="charge"){ctx.setLineDash([10,10]);ctx.strokeStyle="rgba(255,255,255,.65)";ctx.lineWidth=4;ctx.beginPath();ctx.moveTo(G.ball.x,G.ball.y);ctx.lineTo(G.aim.x,G.aim.y);ctx.stroke();ctx.strokeStyle="#ffd833";ctx.lineWidth=7;ctx.beginPath();ctx.moveTo(G.ball.x-12,G.ball.y+10);ctx.lineTo(G.player.x,G.player.y-42);ctx.lineTo(G.ball.x+12,G.ball.y+10);ctx.stroke();ctx.setLineDash([]);ctx.strokeStyle="#ffdf41";ctx.lineWidth=5;ctx.beginPath();ctx.arc(G.aim.x,G.aim.y,22+Math.sin(t*8)*3,0,7);ctx.stroke();ctx.fillStyle="rgba(10,20,30,.55)";round(powerX,480,32,174,16);ctx.fillStyle=G.power>.82?"#ff5252":"#ffd833";ctx.fillRect(powerX+6,648-G.power*160,20,G.power*160);ctx.fillStyle="#fff";ctx.font="800 15px Arial";ctx.textAlign="center";ctx.fillText("POWER",powerX+16,675)}
       let bx=G.ball.x,by=G.ball.y,scale=1;if(G.state==="flight"){const q=Math.min(1,G.shotT/G.shotDur),ease=1-Math.pow(1-q,2);bx=G.from.x+(G.to.x-G.from.x)*ease;by=G.from.y+(G.to.y-G.from.y)*ease-Math.sin(q*Math.PI)*110;scale=1-q*.48}else if(G.state==="result"&&G.deflect){const q=G.shotT;bx=G.deflect.x+G.deflect.vx*q;by=G.deflect.y+G.deflect.vy*q+240*q*q;scale=.55;if(q<.24){ctx.strokeStyle=`rgba(255,255,255,${1-q*4})`;ctx.lineWidth=8;ctx.beginPath();ctx.arc(G.deflect.x,G.deflect.y,24+q*90,0,7);ctx.stroke()}}drawBall(bx,by,scale,t);drawPlayer(G.player.x,G.player.y,t,screen==="victory");
       if(G.state==="idle"&&screen==="playing"){ctx.fillStyle="rgba(8,22,35,.82)";round(430,642,420,46,23);ctx.fillStyle="#fff";ctx.font="800 17px Arial";ctx.textAlign="center";ctx.fillText(G.phase==="placeBall"?"1  DRAG THE GLOWING BALL • RELEASE TO LOCK":"2  PULL YAMAL BACK • RELEASE TO SHOOT",640,671)}
       if(screen==="victory"){for(let i=0;i<70;i++){ctx.fillStyle=["#ffd21f","#e62d37","#fff"][i%3];ctx.fillRect((i*97+t*45*(i%4+1))%W,(i*53+t*95*(i%3+1))%H,7,14)}}
     };
     let raf=0;const loop=(now:number)=>{const dt=Math.min(.033,(now-G.last)/1000);G.last=now;if(screen==="playing"){G.elapsed+=dt;G.net=Math.max(0,G.net-dt*2.5);if(G.state==="run"){G.shotT+=dt;G.player.y-=dt*210; if(G.shotT>=G.runDur)G.launch()}else if(G.state==="flight"){G.shotT+=dt;if(G.shotT>=G.shotDur)G.resolve()}else if(G.state==="result"){G.shotT+=dt;if(G.shotT>.95){G.reset();setResult("")}}G.keeper.x+=G.keeper.v*dt;if(G.keeper.x<455||G.keeper.x>825){G.keeper.v*=-1;G.keeper.v*=.75+Math.random()*.7}if(Math.random()<.005)G.keeper.v*=-1;const remain=Math.max(0,60-G.elapsed);setStats((s:Stats)=>Math.ceil(remain)!==Math.ceil(s.time)?{...s,time:remain}:s);if(remain<=10&&Math.ceil(remain)!==Math.ceil(remain+dt))audio.current.warning();if(remain<=0){setScreen("defeat");audio.current.defeat();}}draw();raf=requestAnimationFrame(loop)};raf=requestAnimationFrame(loop);
     const vis=()=>{if(document.hidden&&screen==="playing")setScreen("paused")};document.addEventListener("visibilitychange",vis);
-    return()=>{elapsedRef.current=G.elapsed;cancelAnimationFrame(raf);clearInterval(keeperRhythm);c.removeEventListener("pointerdown",pd);c.removeEventListener("pointermove",pm);c.removeEventListener("pointerup",pu);c.removeEventListener("pointercancel",pu);window.removeEventListener("keydown",keydown);document.removeEventListener("visibilitychange",vis)};
-  },[screen]);
+    return()=>{elapsedRef.current=G.elapsed;cancelAnimationFrame(raf);clearInterval(keeperRhythm);resizeObserver.disconnect();c.removeEventListener("pointerdown",pd);c.removeEventListener("pointermove",pm);c.removeEventListener("pointerup",pu);c.removeEventListener("pointercancel",pu);window.removeEventListener("keydown",keydown);document.removeEventListener("visibilitychange",vis)};
+  },[screen,mobileMode]);
 
   const acc=stats.shots?Math.round(stats.goals/stats.shots*100):0;
-  return <main className="game-shell">
+  return <main className={mobileMode?"game-shell mobile-game":"game-shell"}>
     <canvas ref={canvasRef} aria-label="World Cup penalty shootout game" />
     <div className="brand"><span>WORLD CUP PENALTY</span><strong>SPAIN <i>VS</i> ARGENTINA</strong></div>
     <div className="orientation-hint"><b>ROTATE YOUR PHONE</b><span>Landscape mode gives you the full pitch and precise controls.</span></div>
