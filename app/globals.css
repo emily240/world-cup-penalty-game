@@ -31,13 +31,16 @@
 
 /* Dedicated iPhone portrait route: HUD and shot result stay outside the pitch. */
 .mobile-game{
-  --mobile-pitch-height:min(44dvh,430px);
+  --mobile-top-space:calc(max(8px,env(safe-area-inset-top)) + 68px);
+  --mobile-bottom-space:max(76px,calc(env(safe-area-inset-bottom) + 68px));
+  --mobile-pitch-height:calc(100dvh - var(--mobile-top-space) - var(--mobile-bottom-space));
   display:flex;
   flex-direction:column;
   justify-content:flex-start;
   align-items:center;
-  padding-top:calc(max(8px,env(safe-area-inset-top)) + 68px);
-  background:linear-gradient(180deg,#071522 0 9%,#133247 56%,#071522 100%);
+  padding-top:var(--mobile-top-space);
+  padding-bottom:var(--mobile-bottom-space);
+  background:repeating-linear-gradient(82deg,#168f45 0 72px,#1aa04d 72px 144px);
 }
 .mobile-game canvas{
   flex:0 0 var(--mobile-pitch-height);
@@ -46,6 +49,9 @@
   max-width:none;
   max-height:none;
   object-fit:fill;
+  background:
+    radial-gradient(ellipse at 50% 0,rgba(255,255,255,.12),transparent 42%),
+    repeating-linear-gradient(82deg,#168f45 0 72px,#1aa04d 72px 144px);
   border-top:1px solid #ffffff2a;
   border-bottom:1px solid #ffffff2a;
   box-shadow:0 12px 30px #0008;
@@ -64,10 +70,11 @@
 .mobile-game .hud .target{display:flex}.mobile-game .hud .target b{font-size:11px;line-height:1.1}
 .mobile-game .pause{top:max(15px,calc(env(safe-area-inset-top) + 7px));right:max(8px,env(safe-area-inset-right));z-index:7}
 .mobile-game .result{
-  top:calc(max(8px,env(safe-area-inset-top)) + 68px + var(--mobile-pitch-height) + 12px);
+  top:calc(var(--mobile-top-space) + var(--mobile-pitch-height) + 8px);
   width:100%;
   text-align:center;
   font-size:clamp(32px,11vw,52px);
+  line-height:.95;
   z-index:5;
 }
 @media (orientation:portrait) and (max-width:700px){
@@ -77,8 +84,22 @@
   .mobile-game .endcard{transform:scale(.86)}
 }
 @media (orientation:landscape){
-  .mobile-game{--mobile-pitch-height:100dvh;padding-top:0}
+  .mobile-game{--mobile-top-space:0px;--mobile-bottom-space:0px;--mobile-pitch-height:100dvh;padding:0}
   .mobile-game .hud{left:50%;width:auto;transform:translateX(-50%)}
   .mobile-game .brand{display:flex!important}
   .mobile-game .result{top:115px}
+}
+
+/* Keep countdown glyphs on one stable layer to prevent stale digits on mobile Safari. */
+.hud>div:first-child b{
+  display:block;
+  min-width:2ch;
+  line-height:1;
+  font-variant-numeric:tabular-nums;
+  transform:none;
+}
+.hud .danger{
+  color:#ff4b52;
+  animation:none;
+  text-shadow:0 0 10px rgba(255,75,82,.72);
 }
